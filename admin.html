@@ -30,8 +30,8 @@
 
     <div class="field-group">
       <label>Campagne pour ce dépôt</label>
-      <input type="text" id="campaignInput" placeholder="ex. Les Anneaux Célestes" list="campaignSuggestions" />
-      <datalist id="campaignSuggestions"></datalist>
+      <select id="campaignSelect"></select>
+      <input type="text" id="campaignNewInput" placeholder="Nom de la nouvelle campagne" style="display:none; margin-top:0.5rem;" />
     </div>
 
     <div class="field-group">
@@ -56,6 +56,9 @@
     <div class="upload-queue" id="uploadQueue"></div>
 
     <div class="admin-section-title">Illustrations déposées</div>
+    <div class="field-group">
+      <input type="text" id="manageSearch" placeholder="Rechercher : nom de fichier, légende, tags, campagne..." />
+    </div>
     <div id="manageList"></div>
   </div>
 

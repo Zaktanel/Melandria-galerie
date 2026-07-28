@@ -23,7 +23,7 @@ export default async (req) => {
   const { id, tags, caption, campaign } = body;
   if (!id) return new Response(JSON.stringify({ error: "Identifiant manquant" }), { status: 400 });
 
-  const store = getStore("gallery");
+  const store = getStore({ name: "gallery", consistency: "strong" });
   const manifest = (await store.get("manifest", { type: "json" })) || [];
   const idx = manifest.findIndex((e) => e.id === id);
   if (idx === -1) {

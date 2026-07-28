@@ -25,7 +25,7 @@ export default async (req) => {
     return new Response(JSON.stringify({ error: "Données manquantes" }), { status: 400 });
   }
 
-  const store = getStore("gallery");
+  const store = getStore({ name: "gallery", consistency: "strong" });
   const id = crypto.randomUUID();
   const buffer = Buffer.from(dataBase64, "base64");
 

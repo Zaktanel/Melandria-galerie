@@ -9,10 +9,65 @@
   const fileInput = document.getElementById('fileInput');
   const uploadQueue = document.getElementById('uploadQueue');
   const defaultTags = document.getElementById('defaultTags');
-  const campaignInput = document.getElementById('campaignInput');
+  const campaignSelect = document.getElementById('campaignSelect');
+  const campaignNewInput = document.getElementById('campaignNewInput');
   const captionInput = document.getElementById('captionInput');
-  const campaignSuggestions = document.getElementById('campaignSuggestions');
+  const manageSearch = document.getElementById('manageSearch');
   const manageList = document.getElementById('manageList');
+
+  const NEW_CAMPAIGN_VALUE = '__new__';
+
+  function wireCampaignSelect(selectEl, newInputEl) {
+    selectEl.addEventListener('change', () => {
+      if (selectEl.value === NEW_CAMPAIGN_VALUE) {
+        newInputEl.style.display = 'block';
+        newInputEl.value = '';
+        newInputEl.focus();
+      } else {
+        newInputEl.style.display = 'none';
+      }
+    });
+  }
+
+  function refreshCampaignSelect(selectEl) {
+    const previousValue = selectEl.value;
+    const campaigns = new Set();
+    managedEntries.forEach((e) => { if (e.campaign) campaigns.add(e.campaign); });
+    const sorted = Array.from(campaigns).sort((a, b) => a.localeCompare(b, 'fr'));
+
+    selectEl.innerHTML = '';
+    const optNone = document.createElement('option');
+    optNone.value = '';
+    optNone.textContent = '(Aucune)';
+    selectEl.appendChild(optNone);
+
+    sorted.forEach((camp) => {
+      const opt = document.createElement('option');
+      opt.value = camp;
+      opt.textContent = camp;
+      selectEl.appendChild(opt);
+    });
+
+    const optNew = document.createElement('option');
+    optNew.value = NEW_CAMPAIGN_VALUE;
+    optNew.textContent = '+ Nouvelle campagne...';
+    selectEl.appendChild(optNew);
+
+    if (previousValue && (previousValue === NEW_CAMPAIGN_VALUE || sorted.includes(previousValue))) {
+      selectEl.value = previousValue;
+    } else {
+      selectEl.value = '';
+    }
+  }
+
+  function getCampaignValue(selectEl, newInputEl) {
+    if (selectEl.value === NEW_CAMPAIGN_VALUE) {
+      return newInputEl.value.trim();
+    }
+    return selectEl.value;
+  }
+
+  wireCampaignSelect(campaignSelect, campaignNewInput);
 
   const MAX_DIMENSION = 1920;
   const JPEG_QUALITY = 0.85;
@@ -128,7 +183,7 @@
           dataBase64: base64,
           tags: parseTags(defaultTags.value),
           caption: captionInput.value.trim(),
-          campaign: campaignInput.value.trim(),
+          campaign: getCampaignValue(campaignSelect, campaignNewInput),
         }),
       });
 
@@ -180,25 +235,49 @@
     if (e.dataTransfer.files) handleFiles(e.dataTransfer.files);
   });
 
+  let managedEntries = [];
+
   async function loadManageList() {
-    let entries = [];
     try {
       const res = await fetch('/api/list');
-      entries = await res.json();
-    } catch (e) {}
+      managedEntries = await res.json();
+    } catch (e) {
+      managedEntries = [];
+    }
 
+    refreshCampaignSelect(campaignSelect);
+    renderManageList();
+  }
+
+  function matchesSearch(entry, query) {
+    if (!query) return true;
+    const haystack = [
+      entry.filename || '',
+      entry.caption || '',
+      entry.campaign || '',
+      ...(entry.tags || []),
+    ].join(' ').toLowerCase();
+    return haystack.includes(query.toLowerCase());
+  }
+
+  function renderManageList() {
     manageList.innerHTML = '';
+    const query = manageSearch.value.trim();
+    const visibleEntries = managedEntries.filter((e) => matchesSearch(e, query));
 
-    const campaigns = new Set();
-    entries.forEach((e) => { if (e.campaign) campaigns.add(e.campaign); });
-    campaignSuggestions.innerHTML = '';
-    Array.from(campaigns).sort((a, b) => a.localeCompare(b, 'fr')).forEach((camp) => {
-      const opt = document.createElement('option');
-      opt.value = camp;
-      campaignSuggestions.appendChild(opt);
-    });
+    if (visibleEntries.length === 0) {
+      const empty = document.createElement('p');
+      empty.style.color = 'var(--text-muted)';
+      empty.style.fontFamily = 'var(--font-mono)';
+      empty.style.fontSize = '0.8rem';
+      empty.textContent = managedEntries.length === 0
+        ? 'Aucune illustration déposée pour l\'instant.'
+        : 'Aucun résultat pour cette recherche.';
+      manageList.appendChild(empty);
+      return;
+    }
 
-    entries.forEach((entry) => {
+    visibleEntries.forEach((entry) => {
       const row = document.createElement('div');
       row.className = 'manage-row';
 
@@ -214,12 +293,18 @@
       filenameLabel.textContent = entry.filename;
       info.appendChild(filenameLabel);
 
-      if (entry.campaign) {
-        const campText = document.createElement('div');
-        campText.className = 'tags';
-        campText.textContent = entry.campaign;
-        info.appendChild(campText);
-      }
+      const campaignEditSelect = document.createElement('select');
+      campaignEditSelect.className = 'tags-edit-input';
+      const campaignEditNewInput = document.createElement('input');
+      campaignEditNewInput.type = 'text';
+      campaignEditNewInput.className = 'tags-edit-input';
+      campaignEditNewInput.placeholder = 'Nom de la nouvelle campagne';
+      campaignEditNewInput.style.display = 'none';
+      wireCampaignSelect(campaignEditSelect, campaignEditNewInput);
+      refreshCampaignSelect(campaignEditSelect);
+      campaignEditSelect.value = entry.campaign || '';
+      info.appendChild(campaignEditSelect);
+      info.appendChild(campaignEditNewInput);
 
       const captionEdit = document.createElement('input');
       captionEdit.type = 'text';
@@ -239,7 +324,7 @@
       const saveBtn = document.createElement('button');
       saveBtn.className = 'btn-ghost';
       saveBtn.textContent = 'Enregistrer';
-      saveBtn.onclick = () => saveMetadata(entry.id, tagsEdit, captionEdit, saveBtn);
+      saveBtn.onclick = () => saveMetadata(entry.id, tagsEdit, captionEdit, campaignEditSelect, campaignEditNewInput, saveBtn);
       row.appendChild(saveBtn);
 
       const delBtn = document.createElement('button');
@@ -252,7 +337,9 @@
     });
   }
 
-  async function saveMetadata(id, tagsInput, captionInput, button) {
+  manageSearch.addEventListener('input', renderManageList);
+
+  async function saveMetadata(id, tagsInput, captionInput, campaignSelectEl, campaignNewInputEl, button) {
     const originalLabel = button.textContent;
     button.textContent = 'Enregistrement…';
     button.disabled = true;
@@ -267,6 +354,7 @@
           id,
           tags: parseTags(tagsInput.value),
           caption: captionInput.value.trim(),
+          campaign: getCampaignValue(campaignSelectEl, campaignNewInputEl),
         }),
       });
       if (res.status === 401) {

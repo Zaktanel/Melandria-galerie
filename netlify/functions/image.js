@@ -5,7 +5,7 @@ export default async (req) => {
   const id = url.searchParams.get("id");
   if (!id) return new Response("Identifiant manquant", { status: 400 });
 
-  const store = getStore("gallery");
+  const store = getStore({ name: "gallery", consistency: "strong" });
   const result = await store.getWithMetadata(`images/${id}`, { type: "arrayBuffer" });
   if (!result) return new Response("Introuvable", { status: 404 });
 
