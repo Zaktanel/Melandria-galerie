@@ -10,6 +10,7 @@
   const uploadQueue = document.getElementById('uploadQueue');
   const defaultTags = document.getElementById('defaultTags');
   const campaignInput = document.getElementById('campaignInput');
+  const captionInput = document.getElementById('captionInput');
   const campaignSuggestions = document.getElementById('campaignSuggestions');
   const manageList = document.getElementById('manageList');
 
@@ -126,7 +127,7 @@
           contentType,
           dataBase64: base64,
           tags: parseTags(defaultTags.value),
-          caption: '',
+          caption: captionInput.value.trim(),
           campaign: campaignInput.value.trim(),
         }),
       });
@@ -154,10 +155,11 @@
     }
   }
 
-  function handleFiles(fileList) {
-    Array.from(fileList)
-      .filter((f) => f.type.startsWith('image/'))
-      .forEach(uploadFile);
+  async function handleFiles(fileList) {
+    const files = Array.from(fileList).filter((f) => f.type.startsWith('image/'));
+    for (const file of files) {
+      await uploadFile(file);
+    }
   }
 
   fileInput.addEventListener('change', (e) => handleFiles(e.target.files));
@@ -206,18 +208,39 @@
 
       const info = document.createElement('div');
       info.className = 'info';
-      const cap = document.createElement('div');
-      cap.className = 'cap';
-      cap.textContent = entry.caption || entry.filename;
-      info.appendChild(cap);
-      const tags = document.createElement('div');
-      tags.className = 'tags';
-      const metaBits = [];
-      if (entry.campaign) metaBits.push(entry.campaign);
-      metaBits.push(...(entry.tags || []));
-      tags.textContent = metaBits.join(' · ');
-      info.appendChild(tags);
+
+      const filenameLabel = document.createElement('div');
+      filenameLabel.className = 'tags';
+      filenameLabel.textContent = entry.filename;
+      info.appendChild(filenameLabel);
+
+      if (entry.campaign) {
+        const campText = document.createElement('div');
+        campText.className = 'tags';
+        campText.textContent = entry.campaign;
+        info.appendChild(campText);
+      }
+
+      const captionEdit = document.createElement('input');
+      captionEdit.type = 'text';
+      captionEdit.className = 'tags-edit-input';
+      captionEdit.value = entry.caption || '';
+      captionEdit.placeholder = 'Légende (optionnel)';
+      info.appendChild(captionEdit);
+
+      const tagsEdit = document.createElement('input');
+      tagsEdit.type = 'text';
+      tagsEdit.className = 'tags-edit-input';
+      tagsEdit.value = (entry.tags || []).join(', ');
+      tagsEdit.placeholder = 'Catégorie: Valeur, Catégorie: Valeur...';
+      info.appendChild(tagsEdit);
       row.appendChild(info);
+
+      const saveBtn = document.createElement('button');
+      saveBtn.className = 'btn-ghost';
+      saveBtn.textContent = 'Enregistrer';
+      saveBtn.onclick = () => saveMetadata(entry.id, tagsEdit, captionEdit, saveBtn);
+      row.appendChild(saveBtn);
 
       const delBtn = document.createElement('button');
       delBtn.className = 'btn-ghost';
@@ -227,6 +250,42 @@
 
       manageList.appendChild(row);
     });
+  }
+
+  async function saveMetadata(id, tagsInput, captionInput, button) {
+    const originalLabel = button.textContent;
+    button.textContent = 'Enregistrement…';
+    button.disabled = true;
+    try {
+      const res = await fetch('/api/update', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-admin-password': getPassword(),
+        },
+        body: JSON.stringify({
+          id,
+          tags: parseTags(tagsInput.value),
+          caption: captionInput.value.trim(),
+        }),
+      });
+      if (res.status === 401) {
+        sessionStorage.removeItem('adminPassword');
+        location.reload();
+        return;
+      }
+      const data = await res.json();
+      if (data.success) {
+        button.textContent = 'Enregistré ✓';
+        setTimeout(() => { button.textContent = originalLabel; button.disabled = false; }, 1500);
+      } else {
+        button.textContent = 'Échec';
+        button.disabled = false;
+      }
+    } catch (e) {
+      button.textContent = 'Échec';
+      button.disabled = false;
+    }
   }
 
   async function deleteEntry(id) {

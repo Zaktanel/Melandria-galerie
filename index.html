@@ -26,6 +26,9 @@
   </div>
 
   <main class="gallery">
+    <div class="read-bar" id="readBar">
+      <button class="btn-ghost" id="readFromStartBtn">▶ Lire depuis le début</button>
+    </div>
     <div class="grid" id="grid"></div>
     <div class="empty-state" id="emptyState" style="display:none;">
       <div class="glyph">✦</div>
@@ -40,9 +43,12 @@
 
 <div class="lightbox" id="lightbox">
   <button class="lightbox-close" id="lightboxClose">Fermer ✕</button>
+  <button class="lightbox-nav lightbox-prev" id="lightboxPrev" aria-label="Image précédente">‹</button>
+  <button class="lightbox-nav lightbox-next" id="lightboxNext" aria-label="Image suivante">›</button>
   <div class="lightbox-inner">
     <img id="lightboxImg" src="" alt="" />
     <div class="lightbox-caption" id="lightboxCaption"></div>
+    <div class="lightbox-position" id="lightboxPosition"></div>
   </div>
 </div>
 
