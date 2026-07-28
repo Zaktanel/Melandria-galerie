@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="robots" content="noindex, nofollow" />
+<title>L'Observatoire — Conservateur</title>
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+<canvas id="starfield"></canvas>
+<div class="page">
+
+  <header class="masthead">
+    <div class="eyebrow">Accès restreint</div>
+    <h1>Le Cabinet du Conservateur</h1>
+    <p class="subtitle">Dépôt et classement des illustrations</p>
+  </header>
+
+  <div id="gate" class="gate">
+    <h2>Mot de passe</h2>
+    <input type="password" id="passwordInput" placeholder="••••••••" />
+    <button id="unlockBtn">Entrer</button>
+    <p id="gateError" style="color:#c96a4a; font-family: var(--font-mono); font-size: 0.75rem; margin-top:1rem; display:none;">
+      Mot de passe incorrect.
+    </p>
+  </div>
+
+  <div class="admin-shell" id="adminShell" style="display:none;">
+
+    <div class="field-group">
+      <label>Campagne pour ce dépôt</label>
+      <input type="text" id="campaignInput" placeholder="ex. Les Anneaux Célestes" list="campaignSuggestions" />
+      <datalist id="campaignSuggestions"></datalist>
+    </div>
+
+    <div class="field-group">
+      <label>Tags par défaut pour ce dépôt (séparés par des virgules)</label>
+      <input type="text" id="defaultTags" placeholder="ex. Hellébore, Ombreterre, PNJ" />
+    </div>
+
+    <div class="dropzone" id="dropzone">
+      <span class="glyph">✦</span>
+      Glissez vos illustrations ici, ou
+      <label class="btn" style="display:inline-block; margin-left:0.4rem; cursor:pointer;">
+        parcourir
+        <input type="file" id="fileInput" accept="image/*" multiple style="display:none;" />
+      </label>
+    </div>
+
+    <div class="upload-queue" id="uploadQueue"></div>
+
+    <div class="admin-section-title">Illustrations déposées</div>
+    <div id="manageList"></div>
+  </div>
+
+</div>
+
+<script src="js/starfield.js"></script>
+<script src="js/admin.js"></script>
+</body>
+</html>
