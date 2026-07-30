@@ -19,6 +19,15 @@
 
   const NEW_CAMPAIGN_VALUE = '__new__';
 
+  // Construit l'URL d'une image en incluant son numéro de version (voir gallery.js).
+  function imageUrl(entry, size) {
+    let url = '/api/image?id=' + entry.id;
+    if (size) url += '&size=' + size;
+    const version = entry.imageVersion || entry.uploadedAt;
+    if (version) url += '&v=' + encodeURIComponent(version);
+    return url;
+  }
+
   function wireCampaignSelect(selectEl, newInputEl) {
     selectEl.addEventListener('change', () => {
       if (selectEl.value === NEW_CAMPAIGN_VALUE) {
@@ -308,7 +317,7 @@
       row.className = 'manage-row';
 
       const img = document.createElement('img');
-      img.src = '/api/image?id=' + entry.id + '&size=thumb';
+      img.src = imageUrl(entry, 'thumb');
       row.appendChild(img);
 
       const info = document.createElement('div');
@@ -420,7 +429,7 @@
   }
 
   async function optimizeEntry(entry) {
-    const imgRes = await fetch('/api/image?id=' + entry.id);
+    const imgRes = await fetch(imageUrl(entry), { cache: 'no-store' });
     const blob = await imgRes.blob();
     const img = await loadImageFromBlob(blob);
     const [fullBase64, thumbBase64] = await Promise.all([

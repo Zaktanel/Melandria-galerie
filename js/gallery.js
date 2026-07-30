@@ -15,6 +15,17 @@
 
   const UNCATEGORIZED = 'Non classé';
 
+  // Construit l'URL d'une image en incluant son numéro de version : ça force
+  // le navigateur à retélécharger si l'image a été ré-encodée depuis (sinon
+  // il continuerait de servir l'ancienne version depuis son cache local).
+  function imageUrl(entry, size) {
+    let url = '/api/image?id=' + entry.id;
+    if (size) url += '&size=' + size;
+    const version = entry.imageVersion || entry.uploadedAt;
+    if (version) url += '&v=' + encodeURIComponent(version);
+    return url;
+  }
+
   let entries = [];
   let activeCampaign = null;
   let activeFilters = {}; // catKey (minuscules) -> valeur sélectionnée (minuscules) ou null
@@ -234,7 +245,7 @@
 
       const img = document.createElement('img');
       img.loading = 'lazy';
-      img.src = '/api/image?id=' + entry.id;
+      img.src = imageUrl(entry);
       img.alt = entry.caption || entry.filename || 'Illustration';
       plate.appendChild(img);
 
@@ -277,7 +288,7 @@
   function renderLightbox() {
     if (currentIndex < 0 || currentIndex >= currentDisplay.length) return;
     const { entry, plateNumber } = currentDisplay[currentIndex];
-    lightboxImg.src = '/api/image?id=' + entry.id;
+    lightboxImg.src = imageUrl(entry);
     lightboxImg.alt = entry.caption || entry.filename || '';
     lightboxCaption.textContent = entry.caption || '';
     lightboxPosition.textContent = 'Planche ' + plateNumber + ' — ' + (currentIndex + 1) + ' / ' + currentDisplay.length;

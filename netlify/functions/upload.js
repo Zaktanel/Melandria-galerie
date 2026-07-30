@@ -45,6 +45,7 @@ export default async (req) => {
     id,
     filename: filename || "illustration",
     contentType,
+    imageVersion: Date.now(),
     tags: Array.isArray(tags) ? tags : [],
     caption: caption || "",
     campaign: campaign || "",

@@ -44,6 +44,7 @@ export default async (req) => {
   }
 
   manifest[idx].contentType = contentType;
+  manifest[idx].imageVersion = Date.now();
   await store.setJSON("manifest", manifest);
 
   return new Response(JSON.stringify({ success: true }), {
