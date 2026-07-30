@@ -14,6 +14,8 @@
   const captionInput = document.getElementById('captionInput');
   const manageSearch = document.getElementById('manageSearch');
   const manageList = document.getElementById('manageList');
+  const optimizeBtn = document.getElementById('optimizeBtn');
+  const optimizeStatus = document.getElementById('optimizeStatus');
 
   const NEW_CAMPAIGN_VALUE = '__new__';
 
@@ -112,43 +114,64 @@
       .filter(Boolean);
   }
 
-  function resizeImage(file) {
+  const THUMB_DIMENSION = 240;
+  const THUMB_QUALITY = 0.7;
+
+  // Charge un fichier dans un <img> une seule fois, réutilisé pour produire
+  // la version complète ET la vignette sans redécoder le fichier deux fois.
+  function loadImageElement(file) {
     return new Promise((resolve, reject) => {
       const img = new Image();
       const reader = new FileReader();
       reader.onload = (e) => { img.src = e.target.result; };
       reader.onerror = reject;
-      img.onload = () => {
-        let { width, height } = img;
-        if (width > MAX_DIMENSION || height > MAX_DIMENSION) {
-          const ratio = Math.min(MAX_DIMENSION / width, MAX_DIMENSION / height);
-          width = Math.round(width * ratio);
-          height = Math.round(height * ratio);
-        }
-        const canvas = document.createElement('canvas');
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0, width, height);
-
-        const outType = file.type === 'image/png' ? 'image/png' : 'image/jpeg';
-        canvas.toBlob(
-          (blob) => {
-            const reader2 = new FileReader();
-            reader2.onload = () => {
-              const base64 = reader2.result.split(',')[1];
-              resolve({ base64, contentType: outType });
-            };
-            reader2.onerror = reject;
-            reader2.readAsDataURL(blob);
-          },
-          outType,
-          JPEG_QUALITY
-        );
-      };
+      img.onload = () => resolve(img);
       img.onerror = reject;
       reader.readAsDataURL(file);
     });
+  }
+
+  function drawToJpeg(img, maxDimension, quality) {
+    return new Promise((resolve, reject) => {
+      let { width, height } = img;
+      if (width > maxDimension || height > maxDimension) {
+        const ratio = Math.min(maxDimension / width, maxDimension / height);
+        width = Math.round(width * ratio);
+        height = Math.round(height * ratio);
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, width, height);
+
+      canvas.toBlob(
+        (blob) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result.split(',')[1]);
+          reader.onerror = reject;
+          reader.readAsDataURL(blob);
+        },
+        'image/jpeg',
+        quality
+      );
+    });
+  }
+
+  // Produit systématiquement du JPEG (quel que soit le format d'origine),
+  // en pleine résolution ET en vignette légère.
+  async function resizeImage(file) {
+    const img = await loadImageElement(file);
+    const [fullBase64, thumbBase64] = await Promise.all([
+      drawToJpeg(img, MAX_DIMENSION, JPEG_QUALITY),
+      drawToJpeg(img, THUMB_DIMENSION, THUMB_QUALITY),
+    ]);
+    return {
+      base64: fullBase64,
+      contentType: 'image/jpeg',
+      thumbBase64,
+      thumbContentType: 'image/jpeg',
+    };
   }
 
   async function uploadFile(file) {
@@ -167,8 +190,8 @@
     uploadQueue.prepend(row);
 
     try {
-      const { base64, contentType } = await resizeImage(file);
-      thumb.src = 'data:' + contentType + ';base64,' + base64;
+      const { base64, contentType, thumbBase64, thumbContentType } = await resizeImage(file);
+      thumb.src = 'data:' + thumbContentType + ';base64,' + thumbBase64;
       status.textContent = 'Envoi…';
 
       const res = await fetch('/api/upload', {
@@ -181,6 +204,8 @@
           filename: file.name,
           contentType,
           dataBase64: base64,
+          thumbContentType,
+          thumbDataBase64: thumbBase64,
           tags: parseTags(defaultTags.value),
           caption: captionInput.value.trim(),
           campaign: getCampaignValue(campaignSelect, campaignNewInput),
@@ -247,6 +272,7 @@
 
     refreshCampaignSelect(campaignSelect);
     renderManageList();
+    updateOptimizeStatus();
   }
 
   function matchesSearch(entry, query) {
@@ -282,7 +308,7 @@
       row.className = 'manage-row';
 
       const img = document.createElement('img');
-      img.src = '/api/image?id=' + entry.id;
+      img.src = '/api/image?id=' + entry.id + '&size=thumb';
       row.appendChild(img);
 
       const info = document.createElement('div');
@@ -375,6 +401,87 @@
       button.disabled = false;
     }
   }
+
+  function updateOptimizeStatus() {
+    const remaining = managedEntries.filter((e) => e.contentType !== 'image/jpeg').length;
+    optimizeStatus.textContent = remaining > 0
+      ? `${remaining} image(s) restent à optimiser.`
+      : 'Toutes les images sont déjà optimisées.';
+  }
+
+  function loadImageFromBlob(blob) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      const url = URL.createObjectURL(blob);
+      img.onload = () => { URL.revokeObjectURL(url); resolve(img); };
+      img.onerror = reject;
+      img.src = url;
+    });
+  }
+
+  async function optimizeEntry(entry) {
+    const imgRes = await fetch('/api/image?id=' + entry.id);
+    const blob = await imgRes.blob();
+    const img = await loadImageFromBlob(blob);
+    const [fullBase64, thumbBase64] = await Promise.all([
+      drawToJpeg(img, MAX_DIMENSION, JPEG_QUALITY),
+      drawToJpeg(img, THUMB_DIMENSION, THUMB_QUALITY),
+    ]);
+
+    const res = await fetch('/api/reencode-image', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-admin-password': getPassword(),
+      },
+      body: JSON.stringify({
+        id: entry.id,
+        contentType: 'image/jpeg',
+        dataBase64: fullBase64,
+        thumbContentType: 'image/jpeg',
+        thumbDataBase64: thumbBase64,
+      }),
+    });
+
+    if (res.status === 401) {
+      const err = new Error('unauthorized');
+      err.code = 'unauthorized';
+      throw err;
+    }
+    const data = await res.json();
+    return !!data.success;
+  }
+
+  optimizeBtn.addEventListener('click', async () => {
+    const toProcess = managedEntries.filter((e) => e.contentType !== 'image/jpeg');
+    if (toProcess.length === 0) {
+      optimizeStatus.textContent = 'Toutes les images sont déjà optimisées.';
+      return;
+    }
+
+    optimizeBtn.disabled = true;
+    let done = 0;
+    let failed = 0;
+
+    for (const entry of toProcess) {
+      optimizeStatus.textContent = `Optimisation en cours… ${done + failed} / ${toProcess.length}`;
+      try {
+        const ok = await optimizeEntry(entry);
+        if (ok) done++; else failed++;
+      } catch (e) {
+        if (e.code === 'unauthorized') {
+          sessionStorage.removeItem('adminPassword');
+          location.reload();
+          return;
+        }
+        failed++;
+      }
+    }
+
+    optimizeStatus.textContent = `Terminé : ${done} image(s) optimisée(s)` + (failed ? `, ${failed} en échec.` : '.');
+    optimizeBtn.disabled = false;
+    loadManageList();
+  });
 
   async function deleteEntry(id) {
     if (!confirm('Retirer définitivement cette illustration ?')) return;

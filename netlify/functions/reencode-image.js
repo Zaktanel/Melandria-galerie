@@ -20,42 +20,35 @@ export default async (req) => {
     return new Response(JSON.stringify({ error: "Corps de requête invalide" }), { status: 400 });
   }
 
-  const { filename, contentType, dataBase64, thumbContentType, thumbDataBase64, tags, caption, campaign } = body;
-  if (!dataBase64 || !contentType) {
+  const { id, contentType, dataBase64, thumbContentType, thumbDataBase64 } = body;
+  if (!id || !dataBase64 || !contentType) {
     return new Response(JSON.stringify({ error: "Données manquantes" }), { status: 400 });
   }
 
   const store = getStore({ name: "gallery", consistency: "strong" });
-  const id = crypto.randomUUID();
-  const buffer = Buffer.from(dataBase64, "base64");
+  const manifest = (await store.get("manifest", { type: "json" })) || [];
+  const idx = manifest.findIndex((e) => e.id === id);
+  if (idx === -1) {
+    return new Response(JSON.stringify({ error: "Illustration introuvable" }), { status: 404 });
+  }
 
-  await store.set(`images/${id}`, buffer, {
-    metadata: { contentType, filename: filename || "illustration" },
-  });
+  const filename = manifest[idx].filename || "illustration";
+  const buffer = Buffer.from(dataBase64, "base64");
+  await store.set(`images/${id}`, buffer, { metadata: { contentType, filename } });
 
   if (thumbDataBase64 && thumbContentType) {
     const thumbBuffer = Buffer.from(thumbDataBase64, "base64");
     await store.set(`images/${id}-thumb`, thumbBuffer, {
-      metadata: { contentType: thumbContentType, filename: filename || "illustration" },
+      metadata: { contentType: thumbContentType, filename },
     });
   }
 
-  const manifest = (await store.get("manifest", { type: "json" })) || [];
-  const entry = {
-    id,
-    filename: filename || "illustration",
-    contentType,
-    tags: Array.isArray(tags) ? tags : [],
-    caption: caption || "",
-    campaign: campaign || "",
-    uploadedAt: new Date().toISOString(),
-  };
-  manifest.unshift(entry);
+  manifest[idx].contentType = contentType;
   await store.setJSON("manifest", manifest);
 
-  return new Response(JSON.stringify({ success: true, entry }), {
+  return new Response(JSON.stringify({ success: true }), {
     headers: { "content-type": "application/json" },
   });
 };
 
-export const config = { path: "/api/upload" };
+export const config = { path: "/api/reencode-image" };

@@ -25,6 +25,7 @@ export default async (req) => {
 
   const store = getStore({ name: "gallery", consistency: "strong" });
   await store.delete(`images/${id}`);
+  await store.delete(`images/${id}-thumb`);
 
   const manifest = (await store.get("manifest", { type: "json" })) || [];
   const updated = manifest.filter((entry) => entry.id !== id);

@@ -55,6 +55,14 @@
 
     <div class="upload-queue" id="uploadQueue"></div>
 
+    <div class="admin-section-title">Optimiser les images existantes</div>
+    <p style="color: var(--text-muted); font-family: var(--font-body); font-size: 0.9rem; margin: 0 0 1rem;">
+      Convertit en JPEG et génère une vignette légère pour les images déposées avant cette mise à jour.
+      Cette opération retélécharge une fois chaque image concernée — à lancer quand vous avez un peu de marge côté crédits.
+    </p>
+    <button id="optimizeBtn" class="btn-ghost">Optimiser les images existantes</button>
+    <div id="optimizeStatus" style="margin-top: 0.8rem; font-family: var(--font-mono); font-size: 0.78rem; color: var(--text-muted);"></div>
+
     <div class="admin-section-title">Illustrations déposées</div>
     <div class="field-group">
       <input type="text" id="manageSearch" placeholder="Rechercher : nom de fichier, légende, tags, campagne..." />
